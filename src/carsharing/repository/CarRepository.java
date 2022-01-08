@@ -19,7 +19,9 @@ public class CarRepository extends Repository<Car> {
     public CarRepository(final Database database) {
         super(database,
               "INSERT INTO CAR(NAME, COMPANY_ID) VALUES (?, ?)",
-              "SELECT * FROM CAR");
+              "SELECT * FROM CAR",
+              "SELECT * FROM CAR WHERE ID = ?",
+              "UPDATE CAR SET IS_RENTED = ? WHERE ID = ?");
     }
 
     /**
@@ -43,6 +45,12 @@ public class CarRepository extends Repository<Car> {
     }
 
     @Override
+    protected void prepareUpdateStatement(final PreparedStatement preparedStatement, final Car car) throws SQLException {
+        preparedStatement.setBoolean(1, car.isRented());
+        preparedStatement.setInt(2, car.getId());
+    }
+
+    @Override
     protected PreparedStatement prepareStatement(final PreparedStatement preparedStatement, final Car car) throws SQLException {
         preparedStatement.setString(1, car.getName());
         preparedStatement.setInt(2, car.getCompanyId());
@@ -52,10 +60,16 @@ public class CarRepository extends Repository<Car> {
     @Override
     protected void processResultSet(final ResultSet resultSet, final List<Car> entityList) throws SQLException {
         while (resultSet.next()) {
-            final Car car = new Car(resultSet.getInt(1),
-                                    resultSet.getString(2),
-                                    resultSet.getInt(3));
+            final Car car = processResultSet(resultSet);
             entityList.add(car);
         }
+    }
+
+    @Override
+    protected Car processResultSet(final ResultSet resultSet) throws SQLException {
+        return new Car(resultSet.getInt(1),
+                       resultSet.getString(2),
+                       resultSet.getInt(3),
+                       resultSet.getBoolean(4));
     }
 }

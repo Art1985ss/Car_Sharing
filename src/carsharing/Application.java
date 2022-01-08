@@ -7,13 +7,17 @@ import carsharing.enums.ManagerMenu;
 import carsharing.models.Car;
 import carsharing.models.Company;
 import carsharing.models.Customer;
+import carsharing.models.Entity;
 import carsharing.repository.CarRepository;
 import carsharing.repository.CompanyRepository;
 import carsharing.repository.CustomerRepository;
+import carsharing.repository.Repository;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class Application {
     private final Scanner scanner = new Scanner(System.in);
@@ -49,7 +53,7 @@ public class Application {
                     managerMenu();
                     break;
                 case LOG_AS_CUSTOMER:
-                    customerMenu();
+                    listMenu(Customer.class, customerRepository, null);
                     break;
                 case CREATE_CUSTOMER:
                     System.out.println("Enter the customer name:");
@@ -73,7 +77,7 @@ public class Application {
             final ManagerMenu managerMenu = ManagerMenu.getByNum(Integer.parseInt(scanner.nextLine()));
             switch (managerMenu) {
                 case COMPANY_LIST:
-                    companyListMenu();
+                    listMenu(Company.class, companyRepository, null);
                     break;
                 case CREATE_COMPANY:
                     System.out.println();
@@ -85,28 +89,6 @@ public class Application {
                     return;
             }
         }
-    }
-
-    /**
-     * This method displays and manages entity list menu
-     */
-    private void companyListMenu() {
-        final List<Company> companyList = companyRepository.getAll();
-        if (companyList.isEmpty()) {
-            System.out.println("The company list is empty!");
-            return;
-        }
-        System.out.println("Choose the company:");
-        companyList.stream()
-                .sorted()
-                .forEach(System.out::println);
-        System.out.println("0. Back");
-        final int userSelection = Integer.parseInt(scanner.nextLine());
-        if (userSelection == 0) return;
-        companyList.stream()
-                .filter(company -> company.getId() == userSelection)
-                .findFirst()
-                .ifPresent(this::companyMenu);
     }
 
     /**
@@ -138,7 +120,7 @@ public class Application {
                     System.out.println();
                     System.out.println("Enter the car name:");
                     final String name = scanner.nextLine();
-                    final Car car = new Car(name, company.getId());
+                    final Car car = new Car(name, company.getId(), false);
                     if (carRepository.create(car)) System.out.println("The car was added!");
                     break;
                 case BACK:
@@ -147,38 +129,98 @@ public class Application {
         }
     }
 
-    private void customerListMenu() {
-        final List<Customer> customerList = customerRepository.getAll();
-        if (customerList.isEmpty()) {
-            System.out.println("The company list is empty!");
+    private <T extends Entity> void listMenu(final Class<T> tClass,
+                                             final Repository<T> repository,
+                                             final Customer customer) {
+        final String name = tClass.getSimpleName().toLowerCase();
+        final List<T> entityList = repository.getAll();
+        if (entityList.isEmpty()) {
+            System.out.println("The " + name + " list is empty!");
             return;
         }
-        System.out.println("Choose the customer:");
-        customerList.stream()
-                .sorted()
-                .forEach(System.out::println);
+        System.out.println("Choose the " + name + ":");
+        for (int i = 0; i < entityList.size(); i++) {
+            System.out.println(i + 1 + ". " + entityList.get(i).getName());
+        }
         System.out.println("0. Back");
         final int userSelection = Integer.parseInt(scanner.nextLine());
         if (userSelection == 0) return;
-        customerList.stream()
-                .filter(customer -> customer.getId() == userSelection)
-                .findFirst()
-                .ifPresent(this::customerMenu);
+        final T entity = entityList.get(userSelection - 1);
+        if (customer == null) {
+            if (entity instanceof Customer) customerMenu(entity.getId());
+            if (entity instanceof Company) companyMenu((Company) entity);
+        } else {
+            if (entity instanceof Company) companyCarsMenu((Company) entity, customer);
+        }
     }
 
-    private void customerMenu(final Customer customer) {
-        final List<Customer> customers = customerRepository.getAll();
-        if (customers)
+    private void companyCarsMenu(final Company company, Customer customer) {
+        final List<Car> cars = carRepository.getByCompanyId(company.getId()).stream()
+                .filter(car -> !car.isRented())
+                .sorted()
+                .collect(Collectors.toList());
+        if (cars.isEmpty()) {
+            System.out.println("No available cars in the '" + company.getName() + "' company");
+            return;
+        }
+        System.out.println("Choose a car:");
+        for (int i = 0; i < cars.size(); i++) {
+            System.out.println(i + 1 + ". " + cars.get(i).getName());
+        }
+        final int userSelection = Integer.parseInt(scanner.nextLine());
+        if (userSelection == 0) return;
+        final Car car = cars.get(userSelection - 1).setRented(true);
+        final Customer c = customer.setCarId(car.getId());
+        customerRepository.update(c);
+        carRepository.update(car);
+        System.out.println("You rented '" + car.getName() + "'");
+    }
+
+    private void customerMenu(final int customerId) {
         while (true) {
+            final Customer customer = customerRepository.getById(customerId)
+                    .orElseThrow(() -> new NoSuchElementException("No customer with id " + customerId));
             System.out.println();
-            System.out.print(ManagerMenu.asMenu());
+            System.out.print(CustomerMenu.asMenu());
             final CustomerMenu customerMenu = CustomerMenu.getByNum(Integer.parseInt(scanner.nextLine()));
             switch (customerMenu) {
                 case RENT_CAR:
-
+                    if (customer.getCarId() != null) {
+                        System.out.println("You've already rented a car!");
+                        break;
+                    }
+                    listMenu(Company.class, companyRepository, customer);
+                    break;
                 case RETURN_CAR:
+                    if (customer.getCarId() == null)
+                        System.out.println("You didn't rent a car!");
+                    else {
+                        final Integer carId = customer.getCarId();
+                        final Car car = carRepository.getById(carId)
+                                .orElseThrow(()-> new NoSuchElementException("No car with id : " + carId))
+                                .setRented(false);
+                        final Customer c = customer.setCarId(null);
+                        customerRepository.update(c);
+                        carRepository.update(car);
+                        System.out.println("You've returned a rented car!");
+                    }
+                    break;
                 case RENTED_CAR:
-                case BACK: return;
+                    if (customer.getCarId() != null) {
+                        final Car car = carRepository.getById(customer.getCarId())
+                                .orElseThrow(() -> new NoSuchElementException("No car was found with such id"));
+                        final Company company = companyRepository.getById(car.getCompanyId())
+                                .orElseThrow(() -> new NoSuchElementException("No company was found with such id"));
+                        System.out.println("Your rented car:");
+                        System.out.println(car.getName());
+                        System.out.println("Company:");
+                        System.out.println(company.getName());
+                    } else {
+                        System.out.println("You didn't rent a car!");
+                    }
+                    break;
+                case BACK:
+                    return;
             }
         }
     }

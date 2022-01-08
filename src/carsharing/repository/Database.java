@@ -31,7 +31,7 @@ public class Database {
     public Database(final String dbName) {
         final String companySql =
                 "CREATE TABLE IF NOT EXISTS COMPANY (" +
-                        "ID INTEGER PRIMARY KEY NOT NULL," +
+                        "ID INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,\n" +
                         "NAME VARCHAR(64) UNIQUE NOT NULL" +
                         ")";
         final String carSql =
@@ -39,8 +39,9 @@ public class Database {
                 "(\n" +
                 "    ID         INTEGER PRIMARY KEY AUTO_INCREMENT,\n" +
                 "    NAME       VARCHAR(64) UNIQUE NOT NULL,\n" +
-                "    COMPANY_ID INTEGER            NOT NULL,\n" +
-                "    CONSTRAINT fk_company FOREIGN KEY (COMPANY_ID)\n" +
+                        "    COMPANY_ID INTEGER            NOT NULL,\n" +
+                        "    IS_RENTED  BOOLEAN,\n" +
+                        "    CONSTRAINT fk_company FOREIGN KEY (COMPANY_ID)\n" +
                 "        REFERENCES COMPANY (ID)\n" +
                 "        ON DELETE CASCADE\n" +
                 "        ON UPDATE CASCADE\n" +

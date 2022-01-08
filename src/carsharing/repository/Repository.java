@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * This is base repository for entities
@@ -20,11 +21,19 @@ public abstract class Repository<T> implements CRUD<T> {
     protected final Database database;
     private final String createStatement;
     private final String selectStatement;
+    private final String byIdStatement;
+    private final String updateStatement;
 
-    protected Repository(final Database database, final String createStatement, final String selectStatement) {
+    protected Repository(final Database database,
+                         final String createStatement,
+                         final String selectStatement,
+                         final String byIdStatement,
+                         final String updateStatement) {
         this.database = database;
         this.createStatement = createStatement;
         this.selectStatement = selectStatement;
+        this.byIdStatement = byIdStatement;
+        this.updateStatement = updateStatement;
     }
 
     /**
@@ -58,11 +67,44 @@ public abstract class Repository<T> implements CRUD<T> {
             final Statement statement = connection.createStatement();
             final ResultSet resultSet = statement.executeQuery(selectStatement);
             processResultSet(resultSet, entityList);
+            resultSet.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return entityList;
     }
+
+    /**
+     * Method used to search for specific car using id
+     *
+     * @param id by which car search will be made
+     * @return {@link Optional optional} entity object
+     */
+    public Optional<T> getById(final int id) {
+        T t = null;
+        try (final Connection connection = database.createConnection()) {
+            final PreparedStatement statement = connection.prepareStatement(byIdStatement);
+            statement.setInt(1, id);
+            final ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) t = processResultSet(resultSet);
+            resultSet.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return Optional.ofNullable(t);
+    }
+
+    public void update(final T entity) {
+        try (final Connection connection = database.createConnection()) {
+            final PreparedStatement preparedStatement = connection.prepareStatement(updateStatement);
+            prepareUpdateStatement(preparedStatement, entity);
+            preparedStatement.execute();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected abstract void prepareUpdateStatement(final PreparedStatement preparedStatement, final T entity) throws SQLException;
 
     /**
      * This method is used to prepare statement for execution
@@ -81,4 +123,11 @@ public abstract class Repository<T> implements CRUD<T> {
      * @throws SQLException if a database access error occurs; if the columnIndex is not valid
      */
     protected abstract void processResultSet(final ResultSet resultSet, final List<T> entityList) throws SQLException;
+
+    /**
+     * @param resultSet with one entity
+     * @return found entity object
+     * @throws SQLException if the columnIndex is not valid; if a database access error occurs
+     */
+    protected abstract T processResultSet(final ResultSet resultSet) throws SQLException;
 }

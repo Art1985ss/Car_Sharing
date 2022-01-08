@@ -1,63 +1,39 @@
 package carsharing.models;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 /**
  * Class used to operate car data
  *
  * @version 1.0
  */
-public class Car implements Comparable<Car> {
-    /**
-     * Used to increment entity id
-     */
-    private final AtomicInteger count = new AtomicInteger(1);
-    /**
-     * Id of the car
-     */
-    private final int id;
-    /**
-     * Name of the car
-     */
-    private final String name;
+public class Car extends Entity {
+
     /**
      * Reference to Company id which owns this car
      */
     private final int companyId;
+    private final boolean isRented;
 
     /**
-     * @param name      {@link Car#name}
+     * @param name      {@link Entity#getName()}
      * @param companyId {@link Car#companyId}
+     * @param isRented  is this car is in the rent
      */
-    public Car(final String name, final int companyId) {
-        this.id = count.getAndIncrement();
-        this.name = name;
+    public Car(final String name, final int companyId, final boolean isRented) {
+        super(name);
         this.companyId = companyId;
+        this.isRented = isRented;
     }
 
     /**
-     * @param id        {@link Car#id}
-     * @param name      {@link Car#name}
+     * @param id        {@link Entity#getId()}
+     * @param name      {@link Entity#getName()}
      * @param companyId {@link Car#companyId}
+     * @param isRented  if this car is rented
      */
-    public Car(final int id, final String name, final int companyId) {
-        this.id = id;
-        this.name = name;
+    public Car(final int id, final String name, final int companyId, final boolean isRented) {
+        super(id, name);
         this.companyId = companyId;
-    }
-
-    /**
-     * @return {@link Car#id}
-     */
-    public int getId() {
-        return id;
-    }
-
-    /**
-     * @return {@link Car#name}
-     */
-    public String getName() {
-        return name;
+        this.isRented = isRented;
     }
 
     /**
@@ -67,13 +43,11 @@ public class Car implements Comparable<Car> {
         return companyId;
     }
 
-    @Override
-    public int compareTo(final Car other) {
-        return Integer.compare(this.id, other.id);
+    public Car setRented(final boolean isRented) {
+        return new Car(getId(), getName(), getCompanyId(), isRented);
     }
 
-    @Override
-    public String toString() {
-        return id + ". " + name;
+    public boolean isRented() {
+        return isRented;
     }
 }
